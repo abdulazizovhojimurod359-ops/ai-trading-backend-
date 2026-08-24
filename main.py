@@ -29,23 +29,23 @@ async def analyze_chart(file: UploadFile = File(...)):
         data_url = f"data:image/jpeg;base64,{base64_image}"
 
         prompt = """
-        Siz tajribali va professional institutsional treydersiz. Sizga taqdim etilgan treyding grafigini (chart) mukammal darajada tahlil qiling.
+        Siz tajribali va professional treydersiz. Sizga taqdim etilgan treyding grafigini tahlil qiling.
 
-        Tahlil qilish talablari:
-        1. Narx trendini (Upward, Downward yoki Sideways) va asosiy qo'llab-quvvatlash/qarshilik (Support/Resistance) darajalarini aniqlang.
-        2. Sham (Candlestick) strukturasini va texnik indikatorlarni ko'zdan kechiring.
-        3. Bozor holatiga qarab eng to'g'ri kirish strategiyasini tuzing (BUY yoki SELL).
-        4. Risk to Reward nisbati kamida 1:2 bo'lishini ta'minlang.
+        Tahlil talablari:
+        1. Bozor ehtimolligini baholang: BUY ehtimolligi necha foiz (%) va SELL ehtimolligi necha foiz (%)? (Ikkalasining yig'indisi 100% bo'lsin).
+        2. Qaysi foiz yuqori bo'lsa, o'sha yo'nalishni tanlang (BUY yoki SELL).
+        3. Grafik kelajakda qanday harakat qilishi haqida qisqa va aniq BASHORAT (prognoz) bering.
 
-        Javobingizni FAQAT va FAQAT quyidagi JSON formatida qaytaring, ortiqcha matn, kirish yoki xulosa yozmang:
+        Javobni FAQAT va FAQAT ushbu JSON formatida qaytaring:
         {
-            "pair": "Valyuta yoki aktiv nomi (masalan: EUR/USD, XAU/USD, BTC/USDT)",
-            "direction": "BUY yoki SELL",
-            "entry": "Aniq kirish narxi darajasi",
-            "stop_loss": "Stop Loss narxi (SL)",
-            "take_profit": "Take Profit narxi (TP)",
-            "risk_reward": "Risk Reward nisbati (masalan: 1:2.5)",
-            "reason": "Ushbu qarorga kelishning 2-3 ta asosiy texnik sababi (trend, darajalar va shamlar tahlili)"
+            "pair": "Aktiv nomi (masalan: EUR/USD)",
+            "buy_percentage": 75,
+            "sell_percentage": 25,
+            "direction": "BUY",
+            "entry": "Kirish narxi",
+            "stop_loss": "Stop Loss narxi",
+            "take_profit": "Take Profit narxi",
+            "prediction": "Grafik kelajakda qanday harakatlanishi haqida qisqa bashorat (masalan: Narx qarshilik darajasini yorib o'tib, yuqoriga qarab harakatni davom ettirishi kutilmoqda)"
         }
         """
 
@@ -65,14 +65,12 @@ async def analyze_chart(file: UploadFile = File(...)):
         
         raw_content = response.choices[0].message.content.strip()
         
-        # JSON formatini tozalab olish
         if "```json" in raw_content:
             raw_content = raw_content.split("```json")[1].split("```")[0].strip()
         elif "```" in raw_content:
             raw_content = raw_content.split("```")[1].split("```")[0].strip()
             
-        raw_json = json.loads(raw_content)
-        return raw_json
+        return json.loads(raw_content)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
