@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Trading Analyzer</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: white; padding: 20px; text-align: center; }
+        .card { background: #1e1e1e; padding: 20px; border-radius: 12px; margin-top: 15px; }
+        input, button { margin-top: 15px; width: 100%; padding: 12px; border-radius: 8px; border: none; font-size: 16px; }
+        button { background: #007bff; color: white; font-weight: bold; cursor: pointer; }
+        .buy { color: #00ff7f; font-weight: bold; font-size: 20px; }
+        .sell { color: #ff4d4d; font-weight: bold; font-size: 20px; }
+        #loading { display: none; color: #ffcc00; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>📈 AI Trading Analyzer</h2>
+    <p>Grafik rasmini yuklang va AI signalini oling</p>
+
+    <div class="card">
+        <input type="file" id="chartInput" accept="image/*">
+        <button onclick="uploadImage()">Tahlil qilish</button>
+        <div id="loading">Tahlil qilinmoqda, kuting...</div>
+    </div>
+
+    <div id="resultCard" class="card" style="display:none;">
+        <h3>Tahlil Natijasi</h3>
+        <p><strong>Juftlik:</strong> <span id="pair"></span></p>
+        <p><strong>Yo'nalish:</strong> <span id="direction"></span></p>
+        <p><strong>Kirish narxi:</strong> <span id="entry"></span></p>
+        <p><strong>Stop Loss:</strong> <span id="sl"></span></p>
+        <p><strong>Take Profit:</strong> <span id="tp"></span></p>
+        <p><strong>Sababi:</strong> <span id="reason"></span></p>
+    </div>
+
+    <script>
+        async function uploadImage() {
+            const input = document.getElementById('chartInput');
+            if (!input.files[0]) { alert("Iltimos, grafik rasmini tanlang!"); return; }
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultCard').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
+
+            try {
+                const res = await fetch('https://ai-trading-backend-0k52.onrender.com/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                document.getElementById('pair').innerText = data.pair || '-';
+                const dirEl = document.getElementById('direction');
+                dirEl.innerText = data.direction || '-';
+                dirEl.className = data.direction === 'BUY' ? 'buy' : 'sell';
+
+                document.getElementById('entry').innerText = data.entry || '-';
+                document.getElementById('sl').innerText = data.stop_loss || '-';
+                document.getElementById('tp').innerText = data.take_profit || '-';
+                document.getElementById('reason').innerText = data.reason || '-';
+
+                document.getElementById('resultCard').style.display = 'block';
+            } catch (err) {
+                alert("Xatolik yuz berdi. Server uyg'onayotgan bo'lishi mumkin, 30 soniyadan so'ng qayta urinib ko'ring.");
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
