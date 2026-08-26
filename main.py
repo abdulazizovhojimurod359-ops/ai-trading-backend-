@@ -1,10 +1,10 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import groq
+import os
 import json
-import base64
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import google.generativeai as genai
 
-app = FastAPI()
+app = FastAPI(title="GetTrade Style AI Trading API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,63 +14,62 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-GROQ_API_KEY = "gsk_zyla7ULq89n5szAsjEeNWGdyb3FY0LF9amvU79Fk9TNhtBnoyybdshumidi"
-client = groq.Groq(api_key=GROQ_API_KEY)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY topilmadi!")
+
+genai.configure(api_key=GEMINI_API_KEY)
+
+# GetTrade AI uslubidagi professional prompt (FAQAT BUY/SELL foizda, WAIT YO'Q)
+PROMPT = """
+You are a top-tier institutional crypto & forex trader with 15+ years of quantitative technical analysis experience. 
+Analyze the uploaded chart screenshot like GetTrade AI.
+
+CRITICAL INSTRUCTIONS:
+1. DO NOT give "WAIT" or ambiguous signals. Choose either "BUY" (Bullish Trend) or "SELL" (Bearish Trend).
+2. Assign exact signal strength percentages: buy_percentage + sell_percentage MUST equal 100%. (e.g., Buy: 82%, Sell: 18%).
+3. Extract precise key levels from the chart: Entry Price, Stop Loss (SL), Take Profit 1 (TP1), Take Profit 2 (TP2).
+4. Identify trend direction ("UPTREND" or "DOWNTREND") and chart pattern (e.g., Double Bottom, Bull Flag, Support Bounce).
+
+Return ONLY raw JSON, no markdown around it (no ```json):
+{
+  "signal": "BUY",
+  "buy_percentage": 82,
+  "sell_percentage": 18,
+  "trend": "UPTREND",
+  "pattern": "Support Rejection & RSI Bullish Divergence",
+  "entry_price": "1.0850",
+  "stop_loss": "1.0810",
+  "take_profit_1": "1.0910",
+  "take_profit_2": "1.0980",
+  "win_rate_probability": "84%"
+}
+"""
 
 @app.get("/")
 def home():
-    return {"status": "AI Trading Server mukammal ishlamoqda!"}
+    return {"status": "ok", "message": "GetTrade AI Engine Active"}
 
 @app.post("/analyze")
 async def analyze_chart(file: UploadFile = File(...)):
     try:
         contents = await file.read()
-        base64_image = base64.b64encode(contents).decode("utf-8")
-        data_url = f"data:image/jpeg;base64,{base64_image}"
-
-        prompt = """
-        Siz tajribali va professional treydersiz. Sizga taqdim etilgan treyding grafigini tahlil qiling.
-
-        Tahlil talablari:
-        1. Bozor ehtimolligini baholang: BUY ehtimolligi necha foiz (%) va SELL ehtimolligi necha foiz (%)? (Ikkalasining yig'indisi 100% bo'lsin).
-        2. Qaysi foiz yuqori bo'lsa, o'sha yo'nalishni tanlang (BUY yoki SELL).
-        3. Grafik kelajakda qanday harakat qilishi haqida qisqa va aniq BASHORAT (prognoz) bering.
-
-        Javobni FAQAT va FAQAT ushbu JSON formatida qaytaring:
-        {
-            "pair": "Aktiv nomi (masalan: EUR/USD)",
-            "buy_percentage": 75,
-            "sell_percentage": 25,
-            "direction": "BUY",
-            "entry": "Kirish narxi",
-            "stop_loss": "Stop Loss narxi",
-            "take_profit": "Take Profit narxi",
-            "prediction": "Grafik kelajakda qanday harakatlanishi haqida qisqa bashorat (masalan: Narx qarshilik darajasini yorib o'tib, yuqoriga qarab harakatni davom ettirishi kutilmoqda)"
+        image_part = {
+            "mime_type": file.content_type or "image/jpeg",
+            "data": contents
         }
-        """
+        
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content([PROMPT, image_part])
+        
+        raw_text = response.text.strip()
+        if raw_text.startswith("```json"):
+            raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+        elif raw_text.startswith("```"):
+            raw_text = raw_text.replace("```", "").strip()
 
-        response = client.chat.completions.create(
-            model="llama-3.2-11b-vision-instruct",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": data_url}}
-                    ]
-                }
-            ],
-            temperature=0.2
-        )
-        
-        raw_content = response.choices[0].message.content.strip()
-        
-        if "```json" in raw_content:
-            raw_content = raw_content.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw_content:
-            raw_content = raw_content.split("```")[1].split("```")[0].strip()
-            
-        return json.loads(raw_content)
+        data = json.loads(raw_text)
+        return data
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"AI Tahlil xatosi: {str(e)}")
