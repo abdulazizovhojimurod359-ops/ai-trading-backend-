@@ -1,10 +1,10 @@
+import base64
 import os
-import json
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-import google.generativeai as genai
+from groq import Groq
 
-app = FastAPI(title="GetTrade Style AI Trading API")
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,62 +14,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY topilmadi!")
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-genai.configure(api_key=GEMINI_API_KEY)
-
-# GetTrade AI uslubidagi professional prompt (FAQAT BUY/SELL foizda, WAIT YO'Q)
-PROMPT = """
-You are a top-tier institutional crypto & forex trader with 15+ years of quantitative technical analysis experience. 
-Analyze the uploaded chart screenshot like GetTrade AI.
-
-CRITICAL INSTRUCTIONS:
-1. DO NOT give "WAIT" or ambiguous signals. Choose either "BUY" (Bullish Trend) or "SELL" (Bearish Trend).
-2. Assign exact signal strength percentages: buy_percentage + sell_percentage MUST equal 100%. (e.g., Buy: 82%, Sell: 18%).
-3. Extract precise key levels from the chart: Entry Price, Stop Loss (SL), Take Profit 1 (TP1), Take Profit 2 (TP2).
-4. Identify trend direction ("UPTREND" or "DOWNTREND") and chart pattern (e.g., Double Bottom, Bull Flag, Support Bounce).
-
-Return ONLY raw JSON, no markdown around it (no ```json):
-{
-  "signal": "BUY",
-  "buy_percentage": 82,
-  "sell_percentage": 18,
-  "trend": "UPTREND",
-  "pattern": "Support Rejection & RSI Bullish Divergence",
-  "entry_price": "1.0850",
-  "stop_loss": "1.0810",
-  "take_profit_1": "1.0910",
-  "take_profit_2": "1.0980",
-  "win_rate_probability": "84%"
-}
-"""
-
-@app.get("/")
-def home():
-    return {"status": "ok", "message": "GetTrade AI Engine Active"}
 
 @app.post("/analyze")
-async def analyze_chart(file: UploadFile = File(...)):
-    try:
-        contents = await file.read()
-        image_part = {
-            "mime_type": file.content_type or "image/jpeg",
-            "data": contents
-        }
-        
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content([PROMPT, image_part])
-        
-        raw_text = response.text.strip()
-        if raw_text.startswith("```json"):
-            raw_text = raw_text.replace("```json", "").replace("```", "").strip()
-        elif raw_text.startswith("```"):
-            raw_text = raw_text.replace("```", "").strip()
+async def analyze(file: UploadFile = File(...)):
+    contents = await file.read()
+    base64_image = base64.b64encode(contents).decode("utf-8")
 
-        data = json.loads(raw_text)
-        return data
+    prompt = (
+        "Analiz qil: Ushbu grafik rasmiga qarab trading signal ber. "
+        "Javobni faqat va faqat quyidagi JSON formatida qaytar: "
+        '{"signal": "BUY/SELL", "percentage": 85, "entry": "1.2345", "sl": "1.2300", "tp": "1.2400"}'
+    )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Tahlil xatosi: {str(e)}")
+    completion = client.chat.completions.create(
+        model="llama-3.2-11b-vision-preview",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        },
+                    },
+                ],
+            }
+        ],
+        temperature=0.2,
+    )
+
+    return {"result": completion.choices[0].message.content}
