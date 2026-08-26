@@ -1,1 +1,1 @@
-# ai-trading-backend-
+# AI TREDER SIGNALS
