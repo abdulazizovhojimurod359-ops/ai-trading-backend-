@@ -80,8 +80,14 @@ async def analyze(file: UploadFile = File(...)):
         return JSONResponse(status_code=502, content={"detail": "AI javobi JSON formatida emas"})
 
     signal = str(result.get("signal", "BUY")).upper()
-    percentage = max(0, min(100, int(float(result.get("percentage", 50)))))
-    buy = max(0, min(100, int(float(result.get("buy_percentage", percentage if signal == "BUY" else 100 - percentage)))))
+    try:
+        percentage = max(0, min(100, int(float(result.get("percentage", 50)))))
+    except (TypeError, ValueError):
+        percentage = 50
+    try:
+        buy = max(0, min(100, int(float(result.get("buy_percentage", percentage if signal == "BUY" else 100 - percentage)))))
+    except (TypeError, ValueError):
+        buy = percentage if signal == "BUY" else 100 - percentage
     return {
         "signal": signal if signal in {"BUY", "SELL"} else "BUY",
         "trend": result.get("trend", ""), "win_rate_probability": f"{percentage}%",

@@ -227,8 +227,10 @@
 </div>
 
 <script>
+    // Render backend manzili. Cloud dizayniga tegilmagan.
     const BACKEND_BASE_URL = "https://ai-trading-backend-0k52.onrender.com";
-    const ANALYZE_URL = `${BACKEND_BASE_URL}/analyze`;
+    const ANALYZE_URLS = [`${BACKEND_BASE_URL}/analyze`, `${BACKEND_BASE_URL}/api/analyze`];
+    const HEALTH_URL = `${BACKEND_BASE_URL}/health`;
 
     function previewFile() {
         const file = document.getElementById('chartInput').files[0];
@@ -256,12 +258,18 @@
         try {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 120000);
-            const response = await fetch(ANALYZE_URL, {
-                method: "POST",
-                body: formData,
-                signal: controller.signal
-            });
+            let response;
+            let lastError;
+            for (const url of ANALYZE_URLS) {
+                try {
+                    response = await fetch(url, { method: "POST", body: formData, signal: controller.signal });
+                    if (response.status !== 404) break;
+                } catch (error) {
+                    lastError = error;
+                }
+            }
             clearTimeout(timeout);
+            if (!response) throw lastError || new Error("Render serveriga ulanib bo'lmadi");
             const raw = await response.text();
             let data;
             try { data = JSON.parse(raw); } catch { data = { detail: raw || "Server javobi bo'sh" }; }
