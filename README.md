@@ -1,1 +1,1 @@
-# AI TREDER SIGNALS
+# AI treding master
