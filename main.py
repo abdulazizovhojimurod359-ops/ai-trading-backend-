@@ -1,8 +1,11 @@
 import base64
 import os
+import json
+
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
+from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
@@ -15,6 +18,16 @@ app.add_middleware(
 )
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "AI Trading Master", "analyze_endpoint": "/analyze"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
 
 
 @app.post("/analyze")
@@ -47,4 +60,25 @@ async def analyze(file: UploadFile = File(...)):
         temperature=0.2,
     )
 
-    return {"result": completion.choices[0].message.content}
+    raw_result = completion.choices[0].message.content or "{}"
+    try:
+        result = json.loads(raw_result.strip().replace("```json", "").replace("```", ""))
+    except json.JSONDecodeError:
+        return JSONResponse(
+            status_code=502,
+            content={"detail": "AI javobi JSON formatida emas", "raw_result": raw_result},
+        )
+
+    # Frontend kutayotgan nomlarga moslashtiramiz.
+    return {
+        "signal": result.get("signal", "BUY"),
+        "trend": result.get("trend", ""),
+        "win_rate_probability": f"{result.get('percentage', 0)}%",
+        "buy_percentage": result.get("buy_percentage", result.get("percentage", 0)),
+        "sell_percentage": result.get("sell_percentage", 100 - result.get("percentage", 0)),
+        "pattern": result.get("pattern", "Noma'lum"),
+        "entry_price": result.get("entry", "0.00"),
+        "stop_loss": result.get("sl", "0.00"),
+        "take_profit_1": result.get("tp1", result.get("tp", "0.00")),
+        "take_profit_2": result.get("tp2", "0.00"),
+    }
