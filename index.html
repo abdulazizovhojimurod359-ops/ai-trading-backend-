@@ -227,7 +227,8 @@
 </div>
 
 <script>
-    const BACKEND_URL = "https://ai-trading-backend-0k52.onrender.com/analyze";
+    const BACKEND_BASE_URL = "https://ai-trading-backend-0k52.onrender.com";
+    const ANALYZE_URL = `${BACKEND_BASE_URL}/analyze`;
 
     function previewFile() {
         const file = document.getElementById('chartInput').files[0];
@@ -243,6 +244,9 @@
             return;
         }
 
+        const button = document.querySelector('.btn');
+        button.disabled = true;
+        button.innerText = "TAHLIL QILINMOQDA...";
         document.getElementById('spinner').style.display = 'block';
         document.getElementById('result').style.display = 'none';
 
@@ -250,15 +254,17 @@
         formData.append("file", fileInput.files[0]);
 
         try {
-            const response = await fetch(BACKEND_URL, {
+            const response = await fetch(ANALYZE_URL, {
                 method: "POST",
                 body: formData
             });
+            const raw = await response.text();
+            let data;
+            try { data = JSON.parse(raw); } catch { data = { detail: raw || "Server javobi bo'sh" }; }
+            if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
 
-            const data = await response.json();
             document.getElementById('spinner').style.display = 'none';
-
-            if (response.ok) {
+            {
                 const signalBadge = document.getElementById('signalBadge');
                 signalBadge.innerText = data.signal + " (" + data.trend + ")";
                 signalBadge.className = "signal-badge signal-" + data.signal;
@@ -275,12 +281,13 @@
                 document.getElementById('tp2Val').innerText = data.take_profit_2;
 
                 document.getElementById('result').style.display = 'block';
-            } else {
-                alert("Xatolik: " + (data.detail || "Server xatosi"));
             }
         } catch (err) {
+            alert("Xatolik: " + (err.message || "Serverga ulanib bo'lmadi"));
+        } finally {
             document.getElementById('spinner').style.display = 'none';
-            alert("Serverga ulanib bo'lmadi. Render uyg'onayotgan bo'lishi mumkin.");
+            button.disabled = false;
+            button.innerText = "ANALIZ QILISH";
         }
     }
 </script>
