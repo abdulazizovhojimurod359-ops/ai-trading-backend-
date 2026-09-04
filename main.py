@@ -34,6 +34,7 @@ async def health():
 
 
 @app.post("/analyze")
+@app.post("/api/analyze")
 async def analyze(file: UploadFile = File(...)):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=415, detail="Faqat JPG, PNG yoki WEBP rasm yuklang")
